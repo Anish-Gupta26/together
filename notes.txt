@@ -1,0 +1,211 @@
+1. sqllite is the default database of django
+2. create app =  python manage.py startapp base
+3. Let the project know about app
+4. Make urls.py in app
+5. Make project know templates folder. 'DIRS'
+6. Django templating Engine- Tags have closing statement also like for, if
+7. Creating templates folder in app - templates>app_name>files
+8. For dynamic url=>
+    path('room/<str:pk>/',views.room,name="room")
+    In views => def room(request,pk)
+
+9. For connecting pages -  <a href='/room/{{room.id}}'>{{room.topic}}</a>
+
+10. Modern way of adding link to pages = <a href="{% url 'room' room.id %}">
+      'room' is the name attribute. If '' outside then "" inside and vice versa.
+
+11. python manage.py migrate - It creates DB of pre installed apps.
+
+12. Creating a table => Inside models.py of app
+      class Room(models.Model):
+      # host = 
+      # topic =
+      name = models.CharField(max_length=200)
+      description = models.TextField(null=True,blank=True)
+      # participants = 
+      updted = models.DateTimeField(auto_now=True)
+      created = models.DateTimeField(auto_now_add=True)
+
+      def __str__(self):
+          return str(self.name)
+
+
+12. python manage.py makemigrations - Add to the staging area for custom table
+    python manage.py migrate - push the table in DB
+    finally u have to register the table in admin.py in our app - 
+    from .models import Room
+    admin.site.register(Room)
+
+13. For creating admin superuser - python manage.py createsuperuser
+
+14.To fetch data from the DB write query-
+queryset = Modelname.objects.all()
+queryset = Modelname.objects.get()...
+
+15. If the relationship model gets deleted then current model value gets deleted
+    room = models.ForeignKey(Room,on_delete=models.CASCADE)
+
+16. DJango provides builin User model with many attributes. Check documentaion
+    =>from django.contrib.auth.models import User
+
+17. Django provides inbuilt form to render & post the request.
+    Make a new file forms.py in the app
+    from dataclasses import fields
+    from django.forms import ModelForm
+    from .models import Room
+
+    class RoomForm(ModelForm):
+        class Meta:
+            model = Room
+            fields = '__all__'  #Which all fields to be asked from user of model Room
+
+    def createRoom(request):
+        form = RoomForm
+        if request.method=='POST':
+            form = RoomForm(request.POST)
+            if form.is_valid:
+                form.save()
+                return redirect('home') #here home is a  name attribute from urls.py
+
+        context = {'form':form}
+        return render(request,'base/room_form.html',context)
+
+18. TO order by most recent entry
+    In models.py 
+    class Meta:
+        ordering = ['-updated','-created']
+
+19. For Update functionality
+    form = RoomForm(instance=room) #Old value will be prefilled
+     if request.method=='POST':
+        form = RoomForm(request.POST,instance=room)
+        if form.is_valid:
+            form.save()
+            return redirect('home')
+
+20. To go back to previous pages
+    <a href="{{request.META.HTTP_REFERER}}">Go Back</a>
+    room = Room.objects.get(id=pk)
+    if request.method=='POST':
+        room.delete()
+        return redirect('home')
+
+21. search for characters in ModelRoom->ModelTopic->name 
+    Room.objects.filter(topic__name__icontains=q)
+
+    For searching using multiple parameters - 
+    from django.db.models import Q
+     rooms = Room.objects.filter(
+       Q(topic__name__icontains=q) |
+       Q(name__icontains=q) |
+       Q(description__icontains=q) 
+    )
+
+22. To extract any value from a form use "name" tag 
+    in views.py
+    if request.method=='POST':
+    username = request.POST.GET("username")
+    password = request.POST.GET("password")
+
+
+23. For displaying flash msg 
+    Read django documentaion
+
+24. for login user
+    from django.contrib.auth import authenticate, login, logout
+
+    .html - 
+    {% if request.user.is_authenticated %}
+    <a href="{% url 'logout' %}">Logout</a>
+    {% else %}
+    <a href="{% url 'login' %}">Login</a>
+    {% endif %}
+
+    views -  #login
+    if request.method=='POST':
+    username = request.POST.get("username")
+    password = request.POST.get("password")
+    try:
+        user = User.objects.get(username=username)
+    except:
+        messages.error(request, 'User does not exist.')
+
+    user = authenticate(request,username=username,password=password)
+    if user is not None:
+        login(request,user)
+        return redirect('home')
+    else:
+        messages.error(request, 'Invalid Credentials.')
+
+
+    # logout
+        logout(request)   #logout current user using request token
+        return redirect('home')     
+    
+25. For restricting pages use decorators
+    from django.contrib.auth.decorators import login_required
+
+    above any function
+    @login_required(login_url='login')
+
+26. We can directly use variables in html\
+    {% if request.user == room.host %}
+
+27.  if request.user.is_authenticated:   #If already logged in thrn restrict this page
+        return redirect('home')
+
+28. Take care of spacing in html
+    {% if page == 'login' %}
+
+
+29. For using inbuilt user register forms
+    from django.contrib.auth.forms import UserCreationForm
+
+
+30. To retrive all message(child model) from parent model
+    room_messages = room.message_set.all().order_by('-created')
+    **here message is the model 'Message'
+    ** sorted based on creation time first
+
+31. Use filter 'timesince' in html if u want to see time mins or days ago
+
+32. To add an entry to a model
+    if request.method=="POST":
+         message = Message.objects.create(
+                user = request.user,   #Attributes
+                room = room,
+                body = request.POST.get('body'),
+            )
+
+33. Rooms & users are having many to many relationship as a user can be part of many rooms and also a room can have many users.
+    in models - 
+    participants = models.ManyToManyField(User,related_name='participants',blank=True)
+
+    To fetch data from many to many relationship
+    participants = room.participants.all()
+
+34. To add data into many to many model
+     room.participants.add(request.user)
+
+35. For seprate css & images data
+    create folder static outside all & then folders style & images
+
+    To let django know about the static folder
+    In settings.py -     
+    STATICFILES_DIR = [
+        BASE_DIR / 'static'
+    ]
+
+    In .html file-
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'styles/style.css' %}" />
+
+
+35. Django REST framework(API)
+Create a folder api inside the app
+Inside api=>
+__init__.py
+urls.py
+serializers.py
+views.py
+
